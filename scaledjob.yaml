@@ -1,0 +1,104 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: fluxtrainjob
+  namespace: default
+spec:
+  jobTargetRef:
+    template:
+      # metadata:
+      #   annotations:
+      #     dapr.io/enabled: "true"
+      #     dapr.io/app-id: "whisperxjob"
+      #     dapr.io/app-protocol: "grpc"
+      #     dapr.io/app-port: "50051"
+      spec:
+        containers:
+        - name: fluxtrainjob
+          image: zecloud.azurecr.io/fluxtrainingbase:latest
+          imagePullPolicy: Always
+          env:
+           - name: 'TORCH_HOME'
+             value: '/cache/torch'
+           - name: 'HOME'
+             value: '/cache'
+           - name: 'TRANSFORMERS_CACHE'
+             value: '/cache/transformers'
+           - name: 'HF_HOME'
+             value: '/cache/hf'
+           - name: 'HF_TOKEN'
+             valueFrom:
+              secretKeyRef:
+                name: hftoken-secret
+                key: HfToken
+          #  - name: aiavatarconnstring
+          #    valueFrom:
+          #     secretKeyRef:
+          #       name: aiavatar-connstr-secret
+          #       key: ConnectionString
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              python /outputs/scripts/config.py && \
+              python run.py /outputs/scripts/rembrandts.yaml 
+          #envFrom:
+          #  - secretRef:
+          #      name: aiavatar-storage-secret
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+          volumeMounts:
+          - mountPath: "/cache"
+            name: cachemodelsvol
+          - mountPath: "/datasets"
+            name: datasetsvol
+          - mountPath: "/outputs"
+            name: trainoutputsvol
+        restartPolicy: Never
+        tolerations:
+        - key: "sku"
+          operator: "Equal"
+          value: "gpu"
+          effect: "NoSchedule"
+        volumes:
+        - name: cachemodelsvol
+          azureFile:
+            secretName: aiavatar-storage-secret
+            shareName: models
+            readOnly: false
+        - name: trainoutputsvol
+          azureFile:
+            secretName: aiavatar-storage-secret
+            shareName: diffusersoutput
+            readOnly: false
+        - name: datasetsvol
+          azureFile:
+            secretName: aiavatar-storage-secret
+            shareName: datasets
+            readOnly: false
+    backoffLimit: 4 
+    parallelism: 1              # Optional. Max number of desired instances ([docs](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#controlling-parallelism))
+    completions: 1              # Optional. Desired number of successfully finished instances ([docs](https://kubernetes.io/docs/concepts/workloads/controllers/jobs-run-to-completion/#controlling-parallelism))
+  pollingInterval: 5   # Optional. Default: 30 seconds
+  #cooldownPeriod: 30   # Optional. Default: 300 seconds
+  maxReplicaCount: 30  # Optional. Default: 100
+  triggers:
+  - type: azure-queue
+    metadata:
+      queueName: fluxtrainjob
+      #queueLength: '1'
+      #activationQueueLength: '50'
+      #connectionFromEnv: aiavatarconnstring
+      accountName: aiavatar
+    authenticationRef:
+      name: azure-queue-auth
+# ---
+# apiVersion: keda.sh/v1alpha1
+# kind: TriggerAuthentication
+# metadata:
+#   name: azure-queue-auth
+# spec:
+#   secretTargetRef:
+#   - parameter: connection
+#     name: aiavatar-connstr-secret
+#     key: ConnectionString
