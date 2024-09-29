@@ -33,6 +33,7 @@ WORKDIR /app/ai-toolkit
 
 #RUN ln -s /usr/bin/python3 /usr/bin/python
 RUN python -m pip install -r requirements.txt
+RUN python -m pip install azure-storage-queue
 
 
     

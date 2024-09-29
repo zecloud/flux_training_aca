@@ -31,16 +31,16 @@ spec:
               secretKeyRef:
                 name: hftoken-secret
                 key: HfToken
-          #  - name: aiavatarconnstring
-          #    valueFrom:
-          #     secretKeyRef:
-          #       name: aiavatar-connstr-secret
-          #       key: ConnectionString
+           - name: aiavatarconnstring
+             valueFrom:
+              secretKeyRef:
+                name: aiavatar-connstr-secret
+                key: ConnectionString
           command: ["/bin/sh", "-c"]
           args:
             - |
-              python /outputs/scripts/config.py && \
-              python run.py /outputs/scripts/rembrandts.yaml 
+              python -m pip install azure-storage-queue && \
+              python /outputs/scripts/config.py 
           #envFrom:
           #  - secretRef:
           #      name: aiavatar-storage-secret
